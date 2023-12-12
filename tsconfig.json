@@ -3,7 +3,7 @@
     "baseUrl": ".",
     "paths": {
       "@components/*": ["./src/components/*"],
-      "@discord/*": ["src/discord/*"],
+      "@external/*": ["src/external/*"],
     },
     "esModuleInterop": true,
     "jsx": "react"

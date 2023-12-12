@@ -4,7 +4,7 @@ module.exports = {
   webpack: {
     alias: {
       '@components': path.resolve(__dirname, 'src/components'),
-      '@discord': path.resolve(__dirname, 'src/discord'),
+      '@external': path.resolve(__dirname, 'src/external'),
     },
   },
 };

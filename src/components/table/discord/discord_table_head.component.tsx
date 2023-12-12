@@ -5,14 +5,12 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import { visuallyHidden } from "@mui/utils";
-import { DiscordData } from "@discord/discord.type";
-
-
-type Order = "asc" | "desc";
+import { DiscordMessage } from "@external/discord/discord.type";
+import { Order } from "@components/table/table.common";
 
 interface HeadCell {
   disablePadding: boolean;
-  id: keyof DiscordData;
+  id: keyof DiscordMessage;
   label: string;
   numeric: boolean;
 }
@@ -31,6 +29,12 @@ const headCells: readonly HeadCell[] = [
     label: "Title",
   },
   {
+    id: "retailPrice",
+    numeric: true,
+    disablePadding: false,
+    label: "Retail Price",
+  },
+  {
     id: "stockXLink",
     numeric: false,
     disablePadding: false,
@@ -43,6 +47,12 @@ const headCells: readonly HeadCell[] = [
     label: "Goat Link",
   },
   {
+    id: "availableSizes",
+    numeric: false,
+    disablePadding: false,
+    label: "Available Sizes",
+  },
+  {
     id: "date",
     numeric: false,
     disablePadding: false,
@@ -53,7 +63,7 @@ const headCells: readonly HeadCell[] = [
 interface EnhancedTableProps {
   onRequestSort: (
     event: React.MouseEvent<unknown>,
-    property: keyof DiscordData
+    property: keyof DiscordMessage
   ) => void;
   order: Order;
   orderBy: string;
@@ -68,7 +78,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
     onRequestSort,
   } = props;
   const createSortHandler =
-    (property: keyof DiscordData) => (event: React.MouseEvent<unknown>) => {
+    (property: keyof DiscordMessage) => (event: React.MouseEvent<unknown>) => {
       onRequestSort(event, property);
     };
 

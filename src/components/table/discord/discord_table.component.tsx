@@ -7,69 +7,47 @@ import TableContainer from "@mui/material/TableContainer";
 import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
-import EnhancedTableHead from "@components/table/table_head.component";
-import { fetchMessage } from "@discord/fetch_message";
-import { ChannelId, DiscordData } from "@discord/discord.type";
-
-function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
-  if (b[orderBy] < a[orderBy]) {
-    return -1;
-  }
-  if (b[orderBy] > a[orderBy]) {
-    return 1;
-  }
-  return 0;
-}
-
-type Order = "asc" | "desc";
-
-function getComparator<Key extends keyof any>(
-  order: Order,
-  orderBy: Key
-): (
-  a: { [key in Key]: number | string },
-  b: { [key in Key]: number | string }
-) => number {
-  return order === "desc"
-    ? (a, b) => descendingComparator(a, b, orderBy)
-    : (a, b) => -descendingComparator(a, b, orderBy);
-}
-
-function stableSort<T>(
-  array: readonly T[],
-  comparator: (a: T, b: T) => number
-) {
-  const stabilizedThis = array.map((el, index) => [el, index] as [T, number]);
-  stabilizedThis.sort((a, b) => {
-    const order = comparator(a[0], b[0]);
-    if (order !== 0) {
-      return order;
-    }
-    return a[1] - b[1];
-  });
-  return stabilizedThis.map((el) => el[0]);
-}
+import EnhancedTableHead from "@components/table/discord/discord_table_head.component";
+import { fetchDiscordMessage } from "@external/discord/fetch_message";
+import { ChannelId, DiscordTableData } from "@external/discord/discord.type";
+import { getGoatCatalogFromSku } from "@external/goat/api_calls";
+import {
+  Order,
+  getComparator,
+  stableSort,
+} from "@components/table/table.common";
 
 const EnhancedTable: FC = () => {
   const [order, setOrder] = useState<Order>("desc");
-  const [orderBy, setOrderBy] = useState<keyof DiscordData>("date");
+  const [orderBy, setOrderBy] = useState<keyof DiscordTableData>("date");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
 
-  const [rows, setRows] = useState<DiscordData[]>([]);
+  const [rows, setRows] = useState<DiscordTableData[]>([]);
 
-  const fetchDiscord = async () => {
-    const data = await fetchMessage(ChannelId.NIKE_US);
-    setRows(data);
+  const populateDiscordTable = async () => {
+    const data = await fetchDiscordMessage(ChannelId.NIKE_US);
+    const rows: DiscordTableData[] = data
+      .map((d) => ({
+        id: d.id,
+        title: d.title,
+        retailPrice: d.retailPrice,
+        sku: d.sku,
+        stockXLink: d.stockXLink,
+        goatLink: d.goatLink,
+        availableSizes: Object.keys(d.availableSizes).toString(),
+        date: d.date,
+      }));
+    setRows(rows);
   };
 
   useEffect(() => {
-    fetchDiscord();
+    populateDiscordTable();
   }, []);
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
-    property: keyof DiscordData
+    property: keyof DiscordTableData
   ) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
@@ -120,12 +98,12 @@ const EnhancedTable: FC = () => {
                 const labelId = `enhanced-table-checkbox-${index}`;
 
                 const formattedDate = new Intl.DateTimeFormat("en-US", {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZoneName: 'short'
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZoneName: "short",
                 }).format(new Date(row.date));
 
                 return (
@@ -145,10 +123,12 @@ const EnhancedTable: FC = () => {
                     >
                       {row.sku}
                     </TableCell>
-                    <TableCell align="right">{row.title}</TableCell>
-                    <TableCell align="right">{row.stockXLink}</TableCell>
-                    <TableCell align="right">{row.goatLink}</TableCell>
-                    <TableCell align="right">{formattedDate}</TableCell>
+                    <TableCell align="left">{row.title}</TableCell>
+                    <TableCell align="left">{row.retailPrice}</TableCell>
+                    <TableCell align="left">{row.stockXLink}</TableCell>
+                    <TableCell align="left">{row.goatLink}</TableCell>
+                    <TableCell align="left">{row.availableSizes}</TableCell>
+                    <TableCell align="left">{formattedDate}</TableCell>
                   </TableRow>
                 );
               })}

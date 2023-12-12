@@ -1,11 +1,13 @@
 import logo from './logo.svg';
 import './App.css';
-import EnhancedTable from './components/table/table.component';
+import DiscordTable from './components/table/discord/discord_table.component';
+import GoatTable from './components/table/goat/goat_table.component';
 
 function App() {
   return (
     <div className="App">
-      <EnhancedTable />
+      <DiscordTable />
+      {/* <GoatTable /> */}
     </div>
   );
 }
