@@ -35,12 +35,12 @@ const EnhancedTable: FC = () => {
   const [order, setOrder] = useState<Order>("desc");
   const [orderBy, setOrderBy] = useState<keyof GoatCatalogTableData>("profit");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const [rows, setRows] = useState<GoatCatalogTableData[]>([]);
 
   const populateGoatTable = async () => {
-    const msgs: DiscordMessage[] = await fetchDiscordMessage(ChannelId.NIKE_US);
+    const msgs: DiscordMessage[] = await fetchDiscordMessage(ChannelId.US_NIKE_FRONTEND_BACKEND);
     const goatData: GoatCatalogTableData[] = [];
     for (let i = 0; i < Math.min(MAX_ROW, msgs.length); i++) {
       const msg = msgs[i];
@@ -162,9 +162,9 @@ const EnhancedTable: FC = () => {
                     </TableCell>
                     <TableCell align="left">{row.title}</TableCell>
                     <TableCell align="center">{row.size}</TableCell>
-                    <TableCell align="center">{row.retailPrice}</TableCell>
-                    <TableCell align="center">{row.sellingPrice}</TableCell>
-                    <TableCell align="center">{row.profit}</TableCell>
+                    <TableCell align="center">{`\$${row.retailPrice}`}</TableCell>
+                    <TableCell align="center">{`\$${row.sellingPrice}`}</TableCell>
+                    <TableCell align="center">{`\$${row.profit}`}</TableCell>
                     <TableCell align="left">
                       <a href={row.goatLink.toString()} target="_blank">
                         {row.goatLink}

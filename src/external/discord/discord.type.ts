@@ -1,5 +1,6 @@
 export enum ChannelId {
     NIKE_US = "1161659215530688532",
+    US_NIKE_FRONTEND_BACKEND = "1068225788530413588",
 }
 
 export interface DiscordMessage {
@@ -11,6 +12,7 @@ export interface DiscordMessage {
     goatLink: string;
     availableSizes: Record<number, string>;
     date: number;
+    valid: boolean;
 }
 
 export interface DiscordTableData {

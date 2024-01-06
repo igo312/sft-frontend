@@ -10,7 +10,6 @@ import Paper from "@mui/material/Paper";
 import EnhancedTableHead from "@components/table/discord/discord_table_head.component";
 import { fetchDiscordMessage } from "@external/discord/fetch_message";
 import { ChannelId, DiscordTableData } from "@external/discord/discord.type";
-import { getGoatCatalogFromSku } from "@external/goat/api_calls";
 import {
   Order,
   getComparator,
@@ -21,7 +20,7 @@ const EnhancedTable: FC = () => {
   const [order, setOrder] = useState<Order>("desc");
   const [orderBy, setOrderBy] = useState<keyof DiscordTableData>("date");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const [rows, setRows] = useState<DiscordTableData[]>([]);
 
@@ -124,7 +123,7 @@ const EnhancedTable: FC = () => {
                       {row.sku}
                     </TableCell>
                     <TableCell align="left">{row.title}</TableCell>
-                    <TableCell align="left">{row.retailPrice}</TableCell>
+                    <TableCell align="center">{row.retailPrice}</TableCell>
                     <TableCell align="left">{row.stockXLink}</TableCell>
                     <TableCell align="left">{row.goatLink}</TableCell>
                     <TableCell align="left">{row.availableSizes}</TableCell>
