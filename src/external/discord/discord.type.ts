@@ -12,6 +12,7 @@ export interface DiscordMessage {
     goatLink: string;
     availableSizes: Record<number, string>;
     date: number;
+    imageUrl: string;
     valid: boolean;
 }
 
@@ -19,9 +20,7 @@ export interface DiscordTableData {
     id: string;
     title: string;
     sku: string;
-    retailPrice: number;
-    stockXLink: string;
-    goatLink: string;
     availableSizes: string;
+    imageUrl: string;
     date: number;
 }

@@ -25,15 +25,13 @@ const EnhancedTable: FC = () => {
   const [rows, setRows] = useState<DiscordTableData[]>([]);
 
   const populateDiscordTable = async () => {
-    const data = await fetchDiscordMessage(ChannelId.NIKE_US);
+    const data = await fetchDiscordMessage(ChannelId.US_NIKE_FRONTEND_BACKEND);
     const rows: DiscordTableData[] = data.map((d) => ({
       id: d.id,
       title: d.title,
-      retailPrice: d.retailPrice,
       sku: d.sku,
-      stockXLink: d.stockXLink,
-      goatLink: d.goatLink,
       availableSizes: Object.keys(d.availableSizes).toString(),
+      imageUrl: d.imageUrl,
       date: d.date,
     }));
     setRows(rows);
@@ -113,6 +111,14 @@ const EnhancedTable: FC = () => {
                     sx={{ cursor: "pointer" }}
                   >
                     <TableCell padding="checkbox"></TableCell>
+                    <TableCell align="center">{formattedDate}</TableCell>
+                    <TableCell align="center">
+                      <img
+                        src={row.imageUrl.toString()}
+                        width={"70px"}
+                        height={"70px"}
+                      />
+                    </TableCell>
                     <TableCell
                       component="th"
                       id={labelId}
@@ -122,11 +128,7 @@ const EnhancedTable: FC = () => {
                       {row.sku}
                     </TableCell>
                     <TableCell align="left">{row.title}</TableCell>
-                    <TableCell align="center">{row.retailPrice}</TableCell>
-                    <TableCell align="left">{row.stockXLink}</TableCell>
-                    <TableCell align="left">{row.goatLink}</TableCell>
                     <TableCell align="left">{row.availableSizes}</TableCell>
-                    <TableCell align="left">{formattedDate}</TableCell>
                   </TableRow>
                 );
               })}

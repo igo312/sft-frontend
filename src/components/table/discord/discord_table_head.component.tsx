@@ -5,17 +5,29 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import { visuallyHidden } from "@mui/utils";
-import { DiscordMessage } from "@external/discord/discord.type";
+import { DiscordTableData } from "@external/discord/discord.type";
 import { Order } from "@components/table/table.common";
 
 interface HeadCell {
   disablePadding: boolean;
-  id: keyof DiscordMessage;
+  id: keyof DiscordTableData;
   label: string;
   numeric: boolean;
 }
 
 const headCells: readonly HeadCell[] = [
+  {
+    id: "date",
+    numeric: true,
+    disablePadding: false,
+    label: "Datetime",
+  },
+  {
+    id: "imageUrl",
+    numeric: false,
+    disablePadding: false,
+    label: "Image",
+  },
   {
     id: "sku",
     numeric: false,
@@ -29,41 +41,17 @@ const headCells: readonly HeadCell[] = [
     label: "Title",
   },
   {
-    id: "retailPrice",
-    numeric: true,
-    disablePadding: false,
-    label: "Retail Price",
-  },
-  {
-    id: "stockXLink",
-    numeric: false,
-    disablePadding: false,
-    label: "Stock X Links",
-  },
-  {
-    id: "goatLink",
-    numeric: false,
-    disablePadding: false,
-    label: "Goat Link",
-  },
-  {
     id: "availableSizes",
     numeric: false,
     disablePadding: false,
     label: "Available Sizes",
-  },
-  {
-    id: "date",
-    numeric: true,
-    disablePadding: false,
-    label: "Datetime",
   },
 ];
 
 interface EnhancedTableProps {
   onRequestSort: (
     event: React.MouseEvent<unknown>,
-    property: keyof DiscordMessage
+    property: keyof DiscordTableData
   ) => void;
   order: Order;
   orderBy: string;
@@ -78,7 +66,7 @@ function EnhancedTableHead(props: EnhancedTableProps) {
     onRequestSort,
   } = props;
   const createSortHandler =
-    (property: keyof DiscordMessage) => (event: React.MouseEvent<unknown>) => {
+    (property: keyof DiscordTableData) => (event: React.MouseEvent<unknown>) => {
       onRequestSort(event, property);
     };
 

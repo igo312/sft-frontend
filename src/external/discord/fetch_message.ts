@@ -151,6 +151,7 @@ const decodeUsNikeFrontendBackend = (json: any): DiscordMessage => {
   const title = embed.title;
   const live = embed.description.toLowerCase().includes("live");
   const retailPrice = extractRetailPrice(embed.description);
+  const imageUrl = embed.thumbnail.url;
 
   const fields = embed.fields;
   const fieldValues = {};
@@ -200,6 +201,7 @@ const decodeUsNikeFrontendBackend = (json: any): DiscordMessage => {
       : retailPrice,
     availableSizes: availableSizes,
     date,
+    imageUrl,
     valid: live && fieldValues["active"],
   };
 };
@@ -304,6 +306,7 @@ const decodeNikeUs = (json: any): DiscordMessage => {
     goatLink,
     availableSizes,
     date,
+    imageUrl: "",
     valid: true,
   };
 };
