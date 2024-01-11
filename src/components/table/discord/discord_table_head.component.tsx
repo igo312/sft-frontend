@@ -54,7 +54,7 @@ const headCells: readonly HeadCell[] = [
   },
   {
     id: "date",
-    numeric: false,
+    numeric: true,
     disablePadding: false,
     label: "Datetime",
   },

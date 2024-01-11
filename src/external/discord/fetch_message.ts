@@ -45,7 +45,14 @@ export async function fetchDiscordMessage(
       default:
         decodedResult = [];
     }
-    return decodedResult;
+    const skuSet = new Set<string>();
+    return decodedResult.filter((res) => {
+      if (!skuSet.has(res.sku)) {
+        skuSet.add(res.sku);
+        return true;
+      }
+      return false;
+    });
   } catch (error) {
     console.error("Error fetching messages:", error);
     return undefined;
@@ -177,8 +184,10 @@ const decodeUsNikeFrontendBackend = (json: any): DiscordMessage => {
     }
   });
 
-  const availableSizes = {}
-  fieldValues["availableSizes"].forEach(size => {availableSizes[size] = fieldValues["retailLink"]})
+  const availableSizes = {};
+  fieldValues["availableSizes"].forEach((size) => {
+    availableSizes[size] = fieldValues["retailLink"];
+  });
 
   return {
     id,

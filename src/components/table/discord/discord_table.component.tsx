@@ -26,17 +26,16 @@ const EnhancedTable: FC = () => {
 
   const populateDiscordTable = async () => {
     const data = await fetchDiscordMessage(ChannelId.NIKE_US);
-    const rows: DiscordTableData[] = data
-      .map((d) => ({
-        id: d.id,
-        title: d.title,
-        retailPrice: d.retailPrice,
-        sku: d.sku,
-        stockXLink: d.stockXLink,
-        goatLink: d.goatLink,
-        availableSizes: Object.keys(d.availableSizes).toString(),
-        date: d.date,
-      }));
+    const rows: DiscordTableData[] = data.map((d) => ({
+      id: d.id,
+      title: d.title,
+      retailPrice: d.retailPrice,
+      sku: d.sku,
+      stockXLink: d.stockXLink,
+      goatLink: d.goatLink,
+      availableSizes: Object.keys(d.availableSizes).toString(),
+      date: d.date,
+    }));
     setRows(rows);
   };
 

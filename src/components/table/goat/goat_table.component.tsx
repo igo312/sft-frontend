@@ -26,7 +26,7 @@ import {
   stableSort,
 } from "@components/table/table.common";
 
-const MAX_ROW = 1;
+const MAX_ROW = 5;
 
 const toTwoDecimal = (num: number): number =>
   Number((Math.round(num * 100) / 100).toFixed(2));
@@ -40,10 +40,19 @@ const EnhancedTable: FC = () => {
   const [rows, setRows] = useState<GoatCatalogTableData[]>([]);
 
   const populateGoatTable = async () => {
-    const msgs: DiscordMessage[] = await fetchDiscordMessage(ChannelId.US_NIKE_FRONTEND_BACKEND);
+    const msgs: DiscordMessage[] = await fetchDiscordMessage(
+      ChannelId.US_NIKE_FRONTEND_BACKEND
+    );
     const goatData: GoatCatalogTableData[] = [];
+
+    const testSet = new Set<string>();
+
     for (let i = 0; i < Math.min(MAX_ROW, msgs.length); i++) {
       const msg = msgs[i];
+      if (testSet.has(msg.sku)) {
+        console.log("pde ", msg.sku, msgs);
+      }
+      testSet.add(msg.sku);
       const goatCatalog = await getGoatCatalogFromSku(msg.sku);
       const retailPrice = msg.retailPrice;
       const availableSizeSet = new Set(
