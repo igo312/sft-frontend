@@ -10,10 +10,15 @@ export interface DiscordMessage {
     stockXLink: string;
     retailPrice: number;
     goatLink: string;
-    availableSizes: Record<number, string>;
+    availableSizes: Record<number, SizeInfo>;
     date: number;
     imageUrl: string;
     valid: boolean;
+}
+
+export type SizeInfo = {
+    retailLink: string;
+    stock: 'LOW' | 'MEDIUM' | 'HIGH' | 'N/A';
 }
 
 export interface DiscordTableData {

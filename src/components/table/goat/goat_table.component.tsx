@@ -26,10 +26,24 @@ import {
   stableSort,
 } from "@components/table/table.common";
 
-const MAX_ROW = 5;
+const MAX_MSG_TO_LOAD = 3;
+
+const PAYOUT_ADJUSTMENT = 1;
+const GOAT_FEE_RATE = [0.07, 0.029];
+const GOAT_FEE_FIXED = 0;
+
+// const COST_ADJUSTMENT = 1;
+// const COST_DISCOUNT = 1;
+// const COST_OTHER = 0;
 
 const toTwoDecimal = (num: number): number =>
   Number((Math.round(num * 100) / 100).toFixed(2));
+
+const calculatePayout = (num: number): number =>
+  num *
+    PAYOUT_ADJUSTMENT *
+    (1 - GOAT_FEE_RATE.reduce((sum, current) => sum + current, 0)) -
+  GOAT_FEE_FIXED;
 
 const EnhancedTable: FC = () => {
   const [order, setOrder] = useState<Order>("desc");
@@ -47,11 +61,8 @@ const EnhancedTable: FC = () => {
 
     const testSet = new Set<string>();
 
-    for (let i = 0; i < Math.min(MAX_ROW, msgs.length); i++) {
+    for (let i = 0; i < Math.min(MAX_MSG_TO_LOAD, msgs.length); i++) {
       const msg = msgs[i];
-      if (testSet.has(msg.sku)) {
-        console.log("pde ", msg.sku, msgs);
-      }
       testSet.add(msg.sku);
       const goatCatalog = await getGoatCatalogFromSku(msg.sku);
       const retailPrice = msg.retailPrice;
@@ -72,12 +83,16 @@ const EnhancedTable: FC = () => {
             )
             .map((pricing) => ({
               sku: msg.sku,
-              title: msg.title,
+              imageUrl: msg.imageUrl,
+              title: goatCatalog.title,
               size: pricing.size,
-              retailPrice: retailPrice,
+              cost: retailPrice,
               sellingPrice: pricing.lowestListingPrice,
-              profit: toTwoDecimal(pricing.lowestListingPrice - retailPrice),
-              retailLink: msg.availableSizes[pricing.size],
+              profit: toTwoDecimal(
+                calculatePayout(pricing.lowestListingPrice) - retailPrice
+              ),
+              retailLink: msg.availableSizes[pricing.size].retailLink,
+              stock: msg.availableSizes[pricing.size].stock,
               goatLink: msg.goatLink,
               discordMessageDate: msg.date,
             }))
@@ -166,25 +181,36 @@ const EnhancedTable: FC = () => {
                       id={labelId}
                       scope="row"
                       padding="none"
+                      align="right"
                     >
-                      {row.sku}
+                      {formattedDate}
                     </TableCell>
+                    <TableCell align="center">
+                      <img
+                        src={row.imageUrl.toString()}
+                        width={"70px"}
+                        height={"70px"}
+                      />
+                    </TableCell>
+                    <TableCell>{row.sku}</TableCell>
                     <TableCell align="left">{row.title}</TableCell>
                     <TableCell align="center">{row.size}</TableCell>
-                    <TableCell align="center">{`\$${row.retailPrice}`}</TableCell>
-                    <TableCell align="center">{`\$${row.sellingPrice}`}</TableCell>
-                    <TableCell align="center">{`\$${row.profit}`}</TableCell>
+                    <TableCell align="center">{`\$${row.cost}`}</TableCell>
                     <TableCell align="left">
-                      <a href={row.goatLink.toString()} target="_blank">
-                        {row.goatLink}
-                      </a>
+                      <div>{`\$${toTwoDecimal(
+                        calculatePayout(Number(row.sellingPrice))
+                      )}`}</div>
+                      <div>{`(\$${row.sellingPrice}${GOAT_FEE_RATE.map(
+                        (n) => ` - ${n}%`
+                      ).reduce((comb, curr) => comb + curr)})`}</div>
                     </TableCell>
+                    <TableCell align="center">{`\$${row.profit}`}</TableCell>
+                    <TableCell align="center">{row.stock}</TableCell>
                     <TableCell align="left">
                       <a href={row.retailLink.toString()} target="_blank">
                         {row.retailLink}
                       </a>
                     </TableCell>
-                    <TableCell align="right">{formattedDate}</TableCell>
                   </TableRow>
                 );
               })}

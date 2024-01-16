@@ -7,7 +7,6 @@ import TableSortLabel from "@mui/material/TableSortLabel";
 import { visuallyHidden } from "@mui/utils";
 import { GoatCatalogTableData } from "@external/goat/goat.types";
 
-
 type Order = "asc" | "desc";
 
 interface HeadCell {
@@ -17,6 +16,18 @@ interface HeadCell {
   numeric: boolean;
 }
 const headCells: readonly HeadCell[] = [
+  {
+    id: "discordMessageDate",
+    numeric: true,
+    disablePadding: false,
+    label: "Datetime",
+  },
+  {
+    id: "imageUrl",
+    numeric: false,
+    disablePadding: false,
+    label: "Image",
+  },
   {
     id: "sku",
     numeric: false,
@@ -36,40 +47,34 @@ const headCells: readonly HeadCell[] = [
     label: "Size",
   },
   {
-    id: "retailPrice",
+    id: "cost",
     numeric: true,
     disablePadding: false,
-    label: "Retail Price",
+    label: "Cost / Retail Price",
   },
   {
     id: "sellingPrice",
     numeric: true,
     disablePadding: false,
-    label: "Lowest Listing Price",
+    label: "Payout",
   },
   {
     id: "profit",
     numeric: true,
     disablePadding: false,
-    label: "Profit",
+    label: "Estimated Profit",
   },
   {
-    id: "goatLink",
+    id: "stock",
     numeric: false,
     disablePadding: false,
-    label: "Goat Link",
+    label: "Stock",
   },
   {
     id: "retailLink",
     numeric: false,
     disablePadding: false,
     label: "Retail Link",
-  },
-  {
-    id: "discordMessageDate",
-    numeric: true,
-    disablePadding: false,
-    label: "Discord Message Date",
   },
 ];
 
@@ -84,22 +89,17 @@ interface EnhancedTableProps {
 }
 
 function EnhancedTableHead(props: EnhancedTableProps) {
-  const {
-    order,
-    orderBy,
-    rowCount,
-    onRequestSort,
-  } = props;
+  const { order, orderBy, rowCount, onRequestSort } = props;
   const createSortHandler =
-    (property: keyof GoatCatalogTableData) => (event: React.MouseEvent<unknown>) => {
+    (property: keyof GoatCatalogTableData) =>
+    (event: React.MouseEvent<unknown>) => {
       onRequestSort(event, property);
     };
 
   return (
     <TableHead>
       <TableRow>
-        <TableCell padding="checkbox">
-        </TableCell>
+        <TableCell padding="checkbox"></TableCell>
         {headCells.map((headCell) => (
           <TableCell
             key={headCell.id}

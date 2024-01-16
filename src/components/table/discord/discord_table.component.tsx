@@ -111,7 +111,14 @@ const EnhancedTable: FC = () => {
                     sx={{ cursor: "pointer" }}
                   >
                     <TableCell padding="checkbox"></TableCell>
-                    <TableCell align="center">{formattedDate}</TableCell>
+                    <TableCell
+                      component="th"
+                      id={labelId}
+                      scope="row"
+                      padding="none"
+                    >
+                      {formattedDate}
+                    </TableCell>
                     <TableCell align="center">
                       <img
                         src={row.imageUrl.toString()}
@@ -119,14 +126,7 @@ const EnhancedTable: FC = () => {
                         height={"70px"}
                       />
                     </TableCell>
-                    <TableCell
-                      component="th"
-                      id={labelId}
-                      scope="row"
-                      padding="none"
-                    >
-                      {row.sku}
-                    </TableCell>
+                    <TableCell>{row.sku}</TableCell>
                     <TableCell align="left">{row.title}</TableCell>
                     <TableCell align="left">{row.availableSizes}</TableCell>
                   </TableRow>

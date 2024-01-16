@@ -6,8 +6,8 @@ import GoatTable from './components/table/goat/goat_table.component';
 function App() {
   return (
     <div className="App">
-      <DiscordTable />
-      {/* <GoatTable /> */}
+      {/* <DiscordTable /> */}
+      <GoatTable />
     </div>
   );
 }

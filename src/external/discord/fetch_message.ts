@@ -28,20 +28,20 @@ export async function fetchDiscordMessage(
 
     let decodedResult;
     switch (channelId) {
-      case ChannelId.NIKE_US:
-        decodedResult = sortedResult
-          .map((res) => decodeNikeUs(res))
-          .filter(
-            (res) =>
-              Object.keys(res.availableSizes).length !== 0 &&
-              !isNaN(res.retailPrice)
-          );
-        break;
       case ChannelId.US_NIKE_FRONTEND_BACKEND:
         decodedResult = sortedResult
           .map((res) => decodeUsNikeFrontendBackend(res))
           .filter((res) => res.valid === true);
         break;
+      // case ChannelId.NIKE_US:
+      //   decodedResult = sortedResult
+      //     .map((res) => decodeNikeUs(res))
+      //     .filter(
+      //       (res) =>
+      //         Object.keys(res.availableSizes).length !== 0 &&
+      //         !isNaN(res.retailPrice)
+      //     );
+      //   break;
       default:
         decodedResult = [];
     }
@@ -68,24 +68,41 @@ const decodeUsNikeFrontendBackend = (json: any): DiscordMessage => {
     return Number(msg.split("(").slice(-1)[0].split("USD")[0]);
   };
 
-  const parseSizes = (sizeInfo: string): number[] => {
-    let result: number[] = [];
+  const parseSizes = (sizeInfo: string): { size: number; stock: string }[] => {
+    let result: { size: number; stock: string }[] = [];
+
     let i = 0;
     let currSize = "";
+    let currStock = "";
+    let bracketCount = 0;
     while (i < sizeInfo.length) {
       if (sizeInfo[i] === "[") {
-        // parse size
         i += 1;
-        while (!isNaN(Number(currSize + sizeInfo[i]))) {
-          currSize += sizeInfo[i];
-          i += 1;
+        bracketCount += 1;
+        if (bracketCount === 1) {
+          // parse size
+          while (!isNaN(Number(currSize + sizeInfo[i]))) {
+            currSize += sizeInfo[i];
+            i += 1;
+          }
+        } else {
+          // parse stock
+          while (sizeInfo[i] !== "]") {
+            currStock += sizeInfo[i];
+            i += 1;
+          }
         }
-        result.push(Number(currSize));
       }
       if (sizeInfo[i] === ")") {
         // end of a size info
         // link is add to cart, not needed
+        result.push({
+          size: Number(currSize),
+          stock: currStock,
+        });
         currSize = "";
+        currStock = "";
+        bracketCount = 0;
       }
       i += 1;
     }
@@ -186,8 +203,12 @@ const decodeUsNikeFrontendBackend = (json: any): DiscordMessage => {
   });
 
   const availableSizes = {};
-  fieldValues["availableSizes"].forEach((size) => {
-    availableSizes[size] = fieldValues["retailLink"];
+  fieldValues["availableSizes"].forEach((sizeAndStock) => {
+    const { size, stock } = sizeAndStock;
+    availableSizes[size] = {
+      retailLink: fieldValues["retailLink"],
+      stock: stock === "" ? "N/A" : stock,
+    };
   });
 
   return {
@@ -199,114 +220,115 @@ const decodeUsNikeFrontendBackend = (json: any): DiscordMessage => {
     retailPrice: fieldValues["discountedPrice"]
       ? fieldValues["discountedPrice"]
       : retailPrice,
-    availableSizes: availableSizes,
+    availableSizes,
     date,
     imageUrl,
     valid: live && fieldValues["active"],
   };
 };
 
-const decodeNikeUs = (json: any): DiscordMessage => {
-  const parsePlatformLinks = (links: string) => {
-    let i = 0;
-    let siteName = "";
-    let stockXLink;
-    let goatLink;
+// const decodeNikeUs = (json: any): DiscordMessage => {
+//   const parsePlatformLinks = (links: string) => {
+//     let i = 0;
+//     let siteName = "";
+//     let stockXLink;
+//     let goatLink;
 
-    while (i < links.length) {
-      if (links[i] === "[") {
-        i += 1;
-        let currSiteName = "";
-        while (links[i] !== "]") {
-          currSiteName += links[i];
-          i += 1;
-        }
-        siteName = currSiteName;
-      } else if (links[i] === "(") {
-        i += 1;
-        let currLink = "";
-        while (links[i] !== ")") {
-          currLink += links[i];
-          i += 1;
-        }
-        if (siteName === "SX") {
-          stockXLink = currLink;
-        } else if (siteName === "Goat") {
-          goatLink = currLink;
-        }
-      }
-      i += 1;
-    }
-    return { stockXLink, goatLink };
-  };
+//     while (i < links.length) {
+//       if (links[i] === "[") {
+//         i += 1;
+//         let currSiteName = "";
+//         while (links[i] !== "]") {
+//           currSiteName += links[i];
+//           i += 1;
+//         }
+//         siteName = currSiteName;
+//       } else if (links[i] === "(") {
+//         i += 1;
+//         let currLink = "";
+//         while (links[i] !== ")") {
+//           currLink += links[i];
+//           i += 1;
+//         }
+//         if (siteName === "SX") {
+//           stockXLink = currLink;
+//         } else if (siteName === "Goat") {
+//           goatLink = currLink;
+//         }
+//       }
+//       i += 1;
+//     }
+//     return { stockXLink, goatLink };
+//   };
 
-  const parseSizes = (sizeInfos: string[]): Record<number, string> => {
-    let result: Record<number, string> = {};
+//   const parseSizes = (sizeInfos: string[]): Record<number, SizeInfo> => {
+//     let result: Record<number, SizeInfo> = {};
 
-    sizeInfos.forEach((sizeInfo) => {
-      let i = 0;
-      let currSize = "";
-      let currLink = "";
-      while (i < sizeInfo.length) {
-        if (sizeInfo[i] === "⎣") {
-          // parse size
-          i += 1;
-          while (sizeInfo[i] !== "⎦") {
-            currSize += sizeInfo[i];
-            i += 1;
-          }
-        }
-        if (sizeInfo[i] === "(") {
-          // parse link
-          i += 1;
-          while (sizeInfo[i] !== ")") {
-            currLink += sizeInfo[i];
-            i += 1;
-          }
-          if (!isNaN(Number(currSize))) {
-            result[Number(currSize)] = currLink;
-          }
-          currSize = "";
-          currLink = "";
-        }
-        i += 1;
-      }
-    });
-    return result;
-  };
+//     sizeInfos.forEach((sizeInfo) => {
+//       let i = 0;
+//       let currSize = "";
+//       let currLink = "";
+//       let currStock = "";
+//       while (i < sizeInfo.length) {
+//         if (sizeInfo[i] === "⎣") {
+//           // parse size
+//           i += 1;
+//           while (sizeInfo[i] !== "⎦") {
+//             currSize += sizeInfo[i];
+//             i += 1;
+//           }
+//         }
+//         if (sizeInfo[i] === "(") {
+//           // parse link
+//           i += 1;
+//           while (sizeInfo[i] !== ")") {
+//             currLink += sizeInfo[i];
+//             i += 1;
+//           }
+//           if (!isNaN(Number(currSize))) {
+//             result[Number(currSize)] = currLink;
+//           }
+//           currSize = "";
+//           currLink = "";
+//         }
+//         i += 1;
+//       }
+//     });
+//     return result;
+//   };
 
-  const extractRetailPrice = (msg: string): number =>
-    Number(
-      msg
-        .split("|")
-        .find((x) => x.includes("USD"))
-        .split("USD")[0]
-    );
+//   const extractRetailPrice = (msg: string): number =>
+//     Number(
+//       msg
+//         .split("|")
+//         .find((x) => x.includes("USD"))
+//         .split("USD")[0]
+//     );
 
-  const id = json.id;
-  const date = new Date(json.timestamp).getTime();
-  const embed = json.embeds[0];
-  const title = embed.title;
+//   const id = json.id;
+//   const date = new Date(json.timestamp).getTime();
+//   const embed = json.embeds[0];
+//   const title = embed.title;
 
-  const fieldValues = embed.fields.map((f) => f.value);
-  const sku = fieldValues[0];
-  const platformLinks = fieldValues[1];
-  const sizesInfos = fieldValues.slice(
-    embed.fields.findIndex((f) => f.name === "Sizes") + 1,
-    fieldValues.length
-  );
-  const { stockXLink, goatLink } = parsePlatformLinks(platformLinks);
-  const availableSizes = parseSizes(sizesInfos);
-  return {
-    id,
-    title,
-    sku,
-    stockXLink,
-    retailPrice: extractRetailPrice(title),
-    goatLink,
-    availableSizes,
-    date,
-    imageUrl: "",
-    valid: true,
-  };
-};
+//   const fieldValues = embed.fields.map((f) => f.value);
+//   const sku = fieldValues[0];
+//   const platformLinks = fieldValues[1];
+//   const sizesInfos = fieldValues.slice(
+//     embed.fields.findIndex((f) => f.name === "Sizes") + 1,
+//     fieldValues.length
+//   );
+//   const { stockXLink, goatLink } = parsePlatformLinks(platformLinks);
+//   const availableSizes = parseSizes(sizesInfos);
+//   return {
+//     id,
+//     title,
+//     sku,
+//     stockXLink,
+//     retailPrice: extractRetailPrice(title),
+//     goatLink,
+//     availableSizes,
+//     date,
+//     imageUrl: "",
+//     valid: true,
+//   };
+// };
