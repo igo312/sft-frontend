@@ -32,18 +32,50 @@ const PAYOUT_ADJUSTMENT = 1;
 const GOAT_FEE_RATE = [0.07, 0.029];
 const GOAT_FEE_FIXED = 0;
 
-// const COST_ADJUSTMENT = 1;
-// const COST_DISCOUNT = 1;
-// const COST_OTHER = 0;
+const COST_ADJUSTMENT = 1;
+const COST_DISCOUNT = [0.1, 0.1];
+const COST_OTHER = 0;
 
 const toTwoDecimal = (num: number): number =>
   Number((Math.round(num * 100) / 100).toFixed(2));
 
 const calculatePayout = (num: number): number =>
-  num *
-    PAYOUT_ADJUSTMENT *
-    (1 - GOAT_FEE_RATE.reduce((sum, current) => sum + current, 0)) -
-  GOAT_FEE_FIXED;
+  toTwoDecimal(
+    num *
+      PAYOUT_ADJUSTMENT *
+      (1 - GOAT_FEE_RATE.reduce((sum, current) => sum + current, 0)) -
+      GOAT_FEE_FIXED
+  );
+
+const calculateCost = (num: number): number =>
+  toTwoDecimal(
+    num *
+      COST_ADJUSTMENT *
+      (1 - COST_DISCOUNT.reduce((sum, current) => sum + current, 0)) +
+      COST_OTHER
+  );
+
+const getCostDetailString = (retailPrice: number): string => {
+  const adjustmentString = COST_ADJUSTMENT === 1 ? "" : `* ${COST_ADJUSTMENT}`;
+  const discountString = `${COST_DISCOUNT.map(
+    (n) => ` - ${toTwoDecimal(n * 100)}%`
+  ).reduce((comb, curr) => comb + curr)}`;
+
+  const otherCostString = COST_OTHER === 0 ? "" : `+ ${COST_OTHER}`;
+
+  return `(\$${retailPrice}${adjustmentString}${discountString}${otherCostString})`;
+};
+
+const getPayoutDetailString = (sellingPrice: number): string => {
+  const adjustmentString =
+    PAYOUT_ADJUSTMENT === 1 ? "" : `* ${PAYOUT_ADJUSTMENT}`;
+  const rateFeeString = `${GOAT_FEE_RATE.map(
+    (n) => ` - ${toTwoDecimal(n * 100)}%`
+  ).reduce((comb, curr) => comb + curr)})`;
+  const fixedFeeString = GOAT_FEE_FIXED === 0 ? "" : `+ ${GOAT_FEE_FIXED}`;
+
+  return `\$${sellingPrice}${adjustmentString}${rateFeeString}${fixedFeeString}`;
+};
 
 const EnhancedTable: FC = () => {
   const [order, setOrder] = useState<Order>("desc");
@@ -89,7 +121,8 @@ const EnhancedTable: FC = () => {
               cost: retailPrice,
               sellingPrice: pricing.lowestListingPrice,
               profit: toTwoDecimal(
-                calculatePayout(pricing.lowestListingPrice) - retailPrice
+                calculatePayout(pricing.lowestListingPrice) -
+                  calculateCost(retailPrice)
               ),
               retailLink: msg.availableSizes[pricing.size].retailLink,
               stock: msg.availableSizes[pricing.size].stock,
@@ -195,14 +228,17 @@ const EnhancedTable: FC = () => {
                     <TableCell>{row.sku}</TableCell>
                     <TableCell align="left">{row.title}</TableCell>
                     <TableCell align="center">{row.size}</TableCell>
-                    <TableCell align="center">{`\$${row.cost}`}</TableCell>
                     <TableCell align="left">
-                      <div>{`\$${toTwoDecimal(
-                        calculatePayout(Number(row.sellingPrice))
-                      )}`}</div>
-                      <div>{`(\$${row.sellingPrice}${GOAT_FEE_RATE.map(
-                        (n) => ` - ${n}%`
-                      ).reduce((comb, curr) => comb + curr)})`}</div>
+                      <div>{`\$${calculateCost(Number(row.cost))}`}</div>
+                      <div>{getCostDetailString(Number(row.cost))}</div>
+                    </TableCell>
+                    <TableCell align="left">
+                      <div>
+                        {`\$${calculatePayout(Number(row.sellingPrice))}`}
+                      </div>
+                      <div>
+                        {getPayoutDetailString(Number(row.sellingPrice))}
+                      </div>
                     </TableCell>
                     <TableCell align="center">{`\$${row.profit}`}</TableCell>
                     <TableCell align="center">{row.stock}</TableCell>
