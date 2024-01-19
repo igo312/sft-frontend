@@ -8,6 +8,8 @@ import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
 import EnhancedTableHead from "@components/table/goat/goat_table_head.component";
+import Tooltip from "@mui/material/Tooltip";
+import QuestionMarkIcon from "@mui/icons-material/QuestionMark";
 import { fetchDiscordMessage } from "@external/discord/fetch_message";
 import {
   GoatCatalogTableData,
@@ -228,16 +230,32 @@ const EnhancedTable: FC = () => {
                     <TableCell>{row.sku}</TableCell>
                     <TableCell align="left">{row.title}</TableCell>
                     <TableCell align="center">{row.size}</TableCell>
-                    <TableCell align="left">
-                      <div>{`\$${calculateCost(Number(row.cost))}`}</div>
-                      <div>{getCostDetailString(Number(row.cost))}</div>
-                    </TableCell>
-                    <TableCell align="left">
+                    <TableCell align="center">
                       <div>
-                        {`\$${calculatePayout(Number(row.sellingPrice))}`}
+                        <Tooltip
+                          title={getCostDetailString(Number(row.cost))}
+                          placement="top-start"
+                        >
+                          <div>
+                            {`\$${calculateCost(Number(row.cost))}`}
+                            <QuestionMarkIcon sx={{ fontSize: 12 }} />
+                          </div>
+                        </Tooltip>
                       </div>
+                    </TableCell>
+                    <TableCell align="center">
                       <div>
-                        {getPayoutDetailString(Number(row.sellingPrice))}
+                        <Tooltip
+                          title={getPayoutDetailString(
+                            Number(row.sellingPrice)
+                          )}
+                          placement="top-start"
+                        >
+                          <div>
+                            {`\$${calculatePayout(Number(row.sellingPrice))}`}
+                            <QuestionMarkIcon sx={{ fontSize: 12 }} />
+                          </div>
+                        </Tooltip>
                       </div>
                     </TableCell>
                     <TableCell align="center">{`\$${row.profit}`}</TableCell>
