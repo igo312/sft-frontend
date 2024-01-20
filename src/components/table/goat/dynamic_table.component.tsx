@@ -1,4 +1,8 @@
-import React, { useEffect, useMemo, FC, useState } from "react";
+import React, {
+  useEffect,
+  FC,
+  useState,
+} from "react";
 import Box from "@mui/material/Box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -7,9 +11,10 @@ import TableContainer from "@mui/material/TableContainer";
 import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
-import EnhancedTableHead from "@components/table/goat/goat_table_head.component";
+import EnhancedTableHead from "@components/table/goat/dynamic_table_head.component";
 import Tooltip from "@mui/material/Tooltip";
 import QuestionMarkIcon from "@mui/icons-material/QuestionMark";
+import DynamicTableFilter from "@components/table/goat/dynamic_table_filters.component";
 import { fetchDiscordMessage } from "@external/discord/fetch_message";
 import {
   GoatCatalogTableData,
@@ -84,20 +89,29 @@ const EnhancedTable: FC = () => {
   const [orderBy, setOrderBy] = useState<keyof GoatCatalogTableData>("profit");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-
   const [rows, setRows] = useState<GoatCatalogTableData[]>([]);
+
+  const [skuFilter, setSkuFilter] = useState<string>("");
+  const [sizeFilter, setSizeFilter] = useState<Set<number>>(
+    new Set([8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 13])
+  );
 
   const populateGoatTable = async () => {
     const msgs: DiscordMessage[] = await fetchDiscordMessage(
       ChannelId.US_NIKE_FRONTEND_BACKEND
     );
-    const goatData: GoatCatalogTableData[] = [];
 
-    const testSet = new Set<string>();
+    const filteredMsgs = msgs.filter((msg) =>
+      msg.sku
+        .replace("-", "")
+        .toLowerCase()
+        .includes(skuFilter.replace("-", "").toLowerCase())
+    );
 
-    for (let i = 0; i < Math.min(MAX_MSG_TO_LOAD, msgs.length); i++) {
-      const msg = msgs[i];
-      testSet.add(msg.sku);
+    const goatTableData: GoatCatalogTableData[] = [];
+
+    for (let i = 0; i < Math.min(MAX_MSG_TO_LOAD, filteredMsgs.length); i++) {
+      const msg = filteredMsgs[i];
       const goatCatalog = await getGoatCatalogFromSku(msg.sku);
       const retailPrice = msg.retailPrice;
       const availableSizeSet = new Set(
@@ -107,13 +121,14 @@ const EnhancedTable: FC = () => {
         const pricingInsights: GoatPricing[] = await getPricingInsight(
           goatCatalog.catalogId
         );
-        goatData.push(
+        goatTableData.push(
           ...pricingInsights
             .filter(
               (pricing) =>
                 pricing.condition === GoatProductCondition.NEW &&
                 pricing.packageCondition === GoatPackageCondition.GOOD &&
-                availableSizeSet.has(pricing.size)
+                availableSizeSet.has(pricing.size) &&
+                (sizeFilter.size === 0 || sizeFilter.has(pricing.size))
             )
             .map((pricing) => ({
               sku: msg.sku,
@@ -134,12 +149,12 @@ const EnhancedTable: FC = () => {
         );
       }
     }
-    setRows(goatData);
+    setRows(goatTableData);
   };
 
   useEffect(() => {
     populateGoatTable();
-  }, []);
+  }, [skuFilter, sizeFilter]);
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
@@ -177,6 +192,12 @@ const EnhancedTable: FC = () => {
   return (
     <Box sx={{ width: "100%" }}>
       <Paper sx={{ width: "100%", mb: 2 }}>
+        <DynamicTableFilter
+          skuFilter={skuFilter}
+          setSkuFilter={setSkuFilter}
+          sizeFilter={sizeFilter}
+          setSizeFilter={setSizeFilter}
+        />
         <TableContainer>
           <Table
             sx={{ minWidth: 750 }}
