@@ -1,19 +1,21 @@
 export enum ChannelId {
     NIKE_US = "1161659215530688532",
     US_NIKE_FRONTEND_BACKEND = "1068225788530413588",
+    FOOTSITE_FRONTEND_MONITOR = "935311814558879835",
+    FOOTSITE_MONITOR_CHECKOUT = "935311816094015608",
 }
 
 export interface DiscordMessage {
     id: string;
     title: string;
     sku: string;
-    stockXLink: string;
     retailPrice: number;
-    goatLink: string;
     availableSizes: Record<number, SizeInfo>;
     date: number;
     imageUrl: string;
-    valid: boolean;
+    isValid: boolean;
+    stockXLink?: string;
+    goatLink?: string;
 }
 
 export type SizeInfo = {

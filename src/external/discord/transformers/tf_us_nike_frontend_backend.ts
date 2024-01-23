@@ -164,7 +164,7 @@ export const transformUsNikeFrontendBackend = (json: any): DiscordMessage => {
     availableSizes,
     date,
     imageUrl,
-    valid: live && fieldValues["active"],
+    isValid: live && fieldValues["active"],
   };
 };
 

@@ -32,7 +32,7 @@ export async function fetchDiscordMessage(
       case ChannelId.US_NIKE_FRONTEND_BACKEND:
         decodedResult = sortedResult
           .map((res) => transformUsNikeFrontendBackend(res))
-          .filter((res) => res.valid === true);
+          .filter((res) => res.isValid === true);
         break;
       // case ChannelId.NIKE_US:
       //   decodedResult = sortedResult
