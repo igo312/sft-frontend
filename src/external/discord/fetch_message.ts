@@ -1,4 +1,5 @@
 import { DiscordMessage, ChannelId } from "@external/discord/discord.type";
+import { transformUsNikeFrontendBackend } from "@external/discord/transformers/tf_us_nike_frontend_backend";
 
 export async function fetchDiscordMessage(
   channelId: string
@@ -30,12 +31,12 @@ export async function fetchDiscordMessage(
     switch (channelId) {
       case ChannelId.US_NIKE_FRONTEND_BACKEND:
         decodedResult = sortedResult
-          .map((res) => decodeUsNikeFrontendBackend(res))
+          .map((res) => transformUsNikeFrontendBackend(res))
           .filter((res) => res.valid === true);
         break;
       // case ChannelId.NIKE_US:
       //   decodedResult = sortedResult
-      //     .map((res) => decodeNikeUs(res))
+      //     .map((res) => transformNikeUs(res))
       //     .filter(
       //       (res) =>
       //         Object.keys(res.availableSizes).length !== 0 &&
@@ -45,6 +46,7 @@ export async function fetchDiscordMessage(
       default:
         decodedResult = [];
     }
+    
     const skuSet = new Set<string>();
     return decodedResult.filter((res) => {
       if (!skuSet.has(res.sku)) {
@@ -59,276 +61,3 @@ export async function fetchDiscordMessage(
   }
 }
 
-const decodeUsNikeFrontendBackend = (json: any): DiscordMessage => {
-  const extractRetailPrice = (msg: string): number => {
-    return Number(msg.split("USD")[0]);
-  };
-
-  const extractDiscountedPrice = (msg: string): number => {
-    return Number(msg.split("(").slice(-1)[0].split("USD")[0]);
-  };
-
-  const parseSizes = (sizeInfo: string): { size: number; stock: string }[] => {
-    let result: { size: number; stock: string }[] = [];
-
-    let i = 0;
-    let currSize = "";
-    let currStock = "";
-    let bracketCount = 0;
-    while (i < sizeInfo.length) {
-      if (sizeInfo[i] === "[") {
-        i += 1;
-        bracketCount += 1;
-        if (bracketCount === 1) {
-          // parse size
-          while (!isNaN(Number(currSize + sizeInfo[i]))) {
-            currSize += sizeInfo[i];
-            i += 1;
-          }
-        } else {
-          // parse stock
-          while (sizeInfo[i] !== "]") {
-            currStock += sizeInfo[i];
-            i += 1;
-          }
-        }
-      }
-      if (sizeInfo[i] === ")") {
-        // end of a size info
-        // link is add to cart, not needed
-        result.push({
-          size: Number(currSize),
-          stock: currStock,
-        });
-        currSize = "";
-        currStock = "";
-        bracketCount = 0;
-      }
-      i += 1;
-    }
-    return result;
-  };
-
-  const extractRetailLink = (msg: string): string => {
-    let link = "";
-    let i = 0;
-    while (i < msg.length) {
-      if (msg[i] === "(") {
-        // parse size
-        i += 1;
-        while (msg[i] != ")") {
-          link += msg[i];
-          i += 1;
-        }
-        if (link.includes("nike.com")) {
-          return link;
-        }
-      }
-      i += 1;
-    }
-    return "";
-  };
-
-  const parsePlatformLinks = (links: string) => {
-    let i = 0;
-    let siteName = "";
-    let stockXLink;
-    let goatLink;
-
-    while (i < links.length) {
-      if (links[i] === "[") {
-        i += 1;
-        let currSiteName = "";
-        while (links[i] !== "]") {
-          currSiteName += links[i];
-          i += 1;
-        }
-        siteName = currSiteName;
-      } else if (links[i] === "(") {
-        i += 1;
-        let currLink = "";
-        while (links[i] !== ")") {
-          currLink += links[i];
-          i += 1;
-        }
-        if (siteName === "StockX") {
-          stockXLink = currLink;
-        } else if (siteName === "GOAT") {
-          goatLink = currLink;
-        }
-      }
-      i += 1;
-    }
-    return { stockXLink, goatLink };
-  };
-
-  const id = json.id;
-  const date = new Date(json.timestamp).getTime();
-  const embed = json.embeds[0];
-  const title = embed.title;
-  const live = embed.description.toLowerCase().includes("live");
-  const retailPrice = extractRetailPrice(embed.description);
-  const imageUrl = embed.thumbnail.url;
-
-  const fields = embed.fields;
-  const fieldValues = {};
-  fields.forEach((field) => {
-    switch (field.name.toLowerCase()) {
-      case "sku":
-        fieldValues["sku"] = field.value;
-        break;
-      case "status":
-        fieldValues["active"] = field.value.toLowerCase().includes("active");
-        break;
-      case "size [stock]":
-        fieldValues["availableSizes"] = parseSizes(field.value);
-        break;
-      case "discount / promo / cod":
-        const discountedPrice = extractDiscountedPrice(field.value);
-        if (!isNaN(discountedPrice)) {
-          fieldValues["discountedPrice"] = discountedPrice;
-        }
-        break;
-      case "channel":
-        fieldValues["retailLink"] = extractRetailLink(field.value);
-        break;
-      case "useful links":
-        const platformLinks = parsePlatformLinks(field.value);
-        fieldValues["stockXLink"] = platformLinks.stockXLink;
-        fieldValues["goatLink"] = platformLinks.goatLink;
-        break;
-      default:
-        break;
-    }
-  });
-
-  const availableSizes = {};
-  fieldValues["availableSizes"].forEach((sizeAndStock) => {
-    const { size, stock } = sizeAndStock;
-    availableSizes[size] = {
-      retailLink: fieldValues["retailLink"],
-      stock: stock === "" ? "N/A" : stock,
-    };
-  });
-
-  return {
-    id,
-    title,
-    sku: fieldValues["sku"],
-    stockXLink: fieldValues["stockXLink"],
-    goatLink: fieldValues["goatLink"],
-    retailPrice: fieldValues["discountedPrice"]
-      ? fieldValues["discountedPrice"]
-      : retailPrice,
-    availableSizes,
-    date,
-    imageUrl,
-    valid: live && fieldValues["active"],
-  };
-};
-
-// const decodeNikeUs = (json: any): DiscordMessage => {
-//   const parsePlatformLinks = (links: string) => {
-//     let i = 0;
-//     let siteName = "";
-//     let stockXLink;
-//     let goatLink;
-
-//     while (i < links.length) {
-//       if (links[i] === "[") {
-//         i += 1;
-//         let currSiteName = "";
-//         while (links[i] !== "]") {
-//           currSiteName += links[i];
-//           i += 1;
-//         }
-//         siteName = currSiteName;
-//       } else if (links[i] === "(") {
-//         i += 1;
-//         let currLink = "";
-//         while (links[i] !== ")") {
-//           currLink += links[i];
-//           i += 1;
-//         }
-//         if (siteName === "SX") {
-//           stockXLink = currLink;
-//         } else if (siteName === "Goat") {
-//           goatLink = currLink;
-//         }
-//       }
-//       i += 1;
-//     }
-//     return { stockXLink, goatLink };
-//   };
-
-//   const parseSizes = (sizeInfos: string[]): Record<number, SizeInfo> => {
-//     let result: Record<number, SizeInfo> = {};
-
-//     sizeInfos.forEach((sizeInfo) => {
-//       let i = 0;
-//       let currSize = "";
-//       let currLink = "";
-//       let currStock = "";
-//       while (i < sizeInfo.length) {
-//         if (sizeInfo[i] === "⎣") {
-//           // parse size
-//           i += 1;
-//           while (sizeInfo[i] !== "⎦") {
-//             currSize += sizeInfo[i];
-//             i += 1;
-//           }
-//         }
-//         if (sizeInfo[i] === "(") {
-//           // parse link
-//           i += 1;
-//           while (sizeInfo[i] !== ")") {
-//             currLink += sizeInfo[i];
-//             i += 1;
-//           }
-//           if (!isNaN(Number(currSize))) {
-//             result[Number(currSize)] = currLink;
-//           }
-//           currSize = "";
-//           currLink = "";
-//         }
-//         i += 1;
-//       }
-//     });
-//     return result;
-//   };
-
-//   const extractRetailPrice = (msg: string): number =>
-//     Number(
-//       msg
-//         .split("|")
-//         .find((x) => x.includes("USD"))
-//         .split("USD")[0]
-//     );
-
-//   const id = json.id;
-//   const date = new Date(json.timestamp).getTime();
-//   const embed = json.embeds[0];
-//   const title = embed.title;
-
-//   const fieldValues = embed.fields.map((f) => f.value);
-//   const sku = fieldValues[0];
-//   const platformLinks = fieldValues[1];
-//   const sizesInfos = fieldValues.slice(
-//     embed.fields.findIndex((f) => f.name === "Sizes") + 1,
-//     fieldValues.length
-//   );
-//   const { stockXLink, goatLink } = parsePlatformLinks(platformLinks);
-//   const availableSizes = parseSizes(sizesInfos);
-//   return {
-//     id,
-//     title,
-//     sku,
-//     stockXLink,
-//     retailPrice: extractRetailPrice(title),
-//     goatLink,
-//     availableSizes,
-//     date,
-//     imageUrl: "",
-//     valid: true,
-//   };
-// };
