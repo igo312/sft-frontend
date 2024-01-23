@@ -22,7 +22,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 from queue import Queue
 import threading
@@ -70,11 +70,14 @@ def produce_main(q, urls, req_urls, consume_count = 10):
             Timer.end()
             Timer.elapsed_time("Getting main page")
             if response.status_code == 200:
-                rjson = response.json()
+                try:
+                    rjson = response.json()
+                except Exception as e:
+                    logger.error(f"parse main page {e}")
+
                 if not rjson['data']['products']['products']:
                     logger.info("Main Page: %s search done"%url)
                     break
-                rjson = response.json()
                 # parse_response_json(response.json(), gender)
                 for item in rjson['data']['products']['products']:
                     q.put(item)
@@ -105,7 +108,7 @@ def consume_main(q):
             image = subItem['images']['squarishURL']
             colorDes = subItem['colorDescription']
             pdqUrl = parseShoeUrl(subItem['pdpUrl'])
-
+            skuid = pdqUrl.split("/")[-1]
             product_id = subItem['pid']
 
             # price 
@@ -133,6 +136,7 @@ def consume_main(q):
                 colorDes =  colorDes,
                 pdqUrl = pdqUrl,
                 pid = product_id,
+                skuid = skuid,
                 price = price_info,
                 inventoryList = inventory_list,
                 rsyID = generate_unique_id(shoe_name, colorDes)
@@ -197,8 +201,12 @@ def _parse_shoe_inventory(driver, pdpUrl, ReferUrl = "https://www.nike.com", max
                 else:
                     # 将含库存的尺码加进去
                     getInven.append(node.next_sibling.text)
-    except Exception as e :
-        logger.error("url is %s, get inventory error: %s"%(url, e))
+    except TimeoutException as e :
+        logger.error("url is {}, Timeout exception".format(url))
+        return [f'not avaliable now: {url}']
+    except Exception as e:
+        print("Unexpected Error:", e)
+        logger.error("url is {}, Timeout exception".format(url))
         return [f'not avaliable now: {url}']
         
     # TODO 

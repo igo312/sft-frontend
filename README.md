@@ -21,9 +21,23 @@ loguru
 2. 使用selenium获取库存页面对应的html，得到库存的信息
 
 
+
 ```
 # 运行下面指令，数据将保存在mongdb名为debug的数据库，collection name为nike中
 python main_mt.py --dbName debug --collectionName nike -l INFO
+
+保存的数据：
+|---------------------------
+|--shoeName      鞋子名称
+|--imageUrl      鞋子图片链接
+|--colorDes      鞋子颜色
+|--pdqUrl        鞋子对应链接
+|--pid           product id
+|--skuid    
+|--price         价格
+|--inventoryList 哪些尺码仍有库存
+|--rsyID         unique id
+|---------------------------
 ```
 
 ## Feature
@@ -34,6 +48,6 @@ python main_mt.py --dbName debug --collectionName nike -l INFO
 
 ## TODO
 
--[ ] 目前mongodb只运行在localhost上，尚未在服务器上尝试
--[ ] 目前只支持数据的插入，对于相同鞋款尚未进行更新
+- [ ] 目前mongodb只运行在localhost上，尚未在服务器上尝试
+- [ ] 目前只支持数据的插入，对于相同鞋款尚未进行更新
     1. 使用了update_one代替， 但未进行测试
