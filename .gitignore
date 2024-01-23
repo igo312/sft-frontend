@@ -1,0 +1,6 @@
+.vscode/**
+logs/**
+*.csv
+**__pycache__**
+# debug ignore
+debug.py
