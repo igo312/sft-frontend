@@ -8,7 +8,7 @@ def queue_monitor(queue, high_threshold, low_threshold, monitor_running):
         elif queue_size < low_threshold:
             logger.warning(f"Queue size ({queue_size}) lower than low threshold ({high_threshold})! Load imbalance detected.")
         else:
-            logger.info(f"Queue size ({queue_size})")
-        time.sleep(2)
+            logger.info(f"Queue size ({queue_size}). Load and put balanced")
+        time.sleep(5)
 
             

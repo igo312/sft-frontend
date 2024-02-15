@@ -22,6 +22,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 from queue import Queue
@@ -30,6 +31,9 @@ from multiprocessing import Event
 
 import argparse
 from config import * 
+import time 
+from tenacity import retry, stop_after_attempt, wait_fixed
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -64,6 +68,10 @@ def generate_unique_id(shoeName, shoeColor):
 def produce_main(q, urls, req_urls, consume_count):
     # TODO: parse 和 请求可以进行分离
     # 使用api请求数据
+    @retry(stop=stop_after_attempt(5), wait=wait_fixed(5))
+    def fetch_url(url, headers):
+        return requests.get(url, headers=headers)
+    
     for i in range(len(urls)):
         start = 0
         url, gender = urls[i]
@@ -72,7 +80,12 @@ def produce_main(q, urls, req_urls, consume_count):
             logger.info("Main Page: %s, Count: %d"%(url, start))
             # response = requests.get(req_url.format(start), headers=api_headers, proxies=proxies)
             Timer.start()
-            response = requests.get(req_url.format(start), headers=api_headers)
+            try:
+                response = fetch_url(req_url.format(start), headers=api_headers)
+            except Exception as e:
+                logger.error("request error, producer exit, error: {}".format(e))
+                break
+
             Timer.end()
             Timer.elapsed_time("Getting main page")
             if response.status_code == 200:
@@ -137,7 +150,7 @@ def consume_main(q, thread_idx):
 
             # parse inventory
             # Timer.start()
-            inventory_list = _parse_shoe_inventory(driver, pdqUrl)
+            inventory_list, driver = _parse_shoe_inventory(driver, pdqUrl, thread_idx)
             
             # Timer.end()
             # Timer.elapsed_time("parse shoe inventory")
@@ -170,7 +183,7 @@ def consume_main(q, thread_idx):
     driver.quit()
 
                 
-def _parse_shoe_inventory(driver, pdpUrl, ReferUrl = "https://www.nike.com", max_wait_time=TIMEOUT):
+def _parse_shoe_inventory(driver, pdpUrl, thread_idx, ReferUrl = "https://www.nike.com", max_wait_time=TIMEOUT):
     class AnyEC:
         """Use with WebDriverWait to combine expected_conditions in an OR."""
         def __init__(self, *args):
@@ -188,10 +201,23 @@ def _parse_shoe_inventory(driver, pdpUrl, ReferUrl = "https://www.nike.com", max
     try:
         driver.get(url)
     except Exception as e:
-        logger.error(f"driver get {url} failed, exception: {e}")
-        with open("driver_error.txt", "a+") as f:
-            f.write("url: {} error: {}\n".format(url, e))
-        return ["driver get url {} failed".format(url)]
+        # logger.error(f"Thread idx:{thread_idx}, driver get {url} failed, exception: {e}")
+        # return ["driver get url {} failed".format(url)]
+        # with open("driver_error.txt", "a+") as f:
+        #     f.write("url: {} error: {}\n".format(url, e))
+        try:
+            logger.warning("Thread idx:{} get new driver".format(thread_idx))
+            # driver.delete_all_cookies()
+            driver = getWebdriver()
+            # time.sleep(5)
+            # driver.get('chrome://settings/clearBrowserData')  # 打开浏览器的清理缓存页面
+            # driver.find_element(By.CSS_SELECTOR, "[slot='button-container']")
+            # driver.find_element(By.ID, 'clearBrowsingDataConfirm').click()  # 模拟键入Enter确认清理
+            driver.get(url)
+        except Exception as e_sub :
+            logger.error(f"Thread idx:{thread_idx}, after cleaning cache, driver get {url} failed, exception: {e_sub}")
+            logger.error(f"Thread idx:{thread_idx}, driver get {url} failed, exception: {e}")
+            return ["driver get url {} failed".format(url)], driver
     
     try:
         # WebDriverWait(driver, max_wait_time).until(lambda driver: custom_expected_conditions(driver))
@@ -202,22 +228,22 @@ def _parse_shoe_inventory(driver, pdpUrl, ReferUrl = "https://www.nike.com", max
         ))
         soup = BeautifulSoup(driver.page_source, 'lxml')
     except TimeoutException as e :
-        logger.error("url is {}, Timeout exception".format(url))
-        return [f'not avaliable now: {url}']
+        logger.error("Thread idx:{} url is {}, Timeout exception".format(thread_idx, url))
+        return [f'not avaliable now: {url}'], driver
     except Exception as e:
         print("Unexpected Error:", e)
-        logger.error("url is {} raise a exception".format(url))
-        return [f'not avaliable now: {url}']
+        logger.error("Thread idx:{} url is {} raise a exception".format(thread_idx, url))
+        return [f'not avaliable now: {url}'], driver
     # finally:
     #     # 避免invalid session id, 不能关闭，因为只打开了一个页面，打开之后相当于退出了driver
     #     driver.close()
 
     if soup.select(".sold-out"):
         logger.info("[Inventory Info] url:%s sold out"%url)
-        return ['sold out']
+        return ['sold out'], driver
     elif soup.find(attrs={'data-test' : "comingSoon"}) is not None:
         logger.info("[Inventory Info] url:%s coming soon"%url)
-        return ['coming soon']
+        return ['coming soon'], driver
     else:
         root =  soup.find(id = 'buyTools')
         nodes = root.select('[aria-describedby="pdp-buytools-low-inventory-messaging"]')
@@ -236,24 +262,24 @@ def _parse_shoe_inventory(driver, pdpUrl, ReferUrl = "https://www.nike.com", max
     # print(soup.find(id="RightRail").prettify())
     # root =  soup.select_one('#buyTools')
     # nodes = root.select('[aria-describedby="pdp-buytools-low-inventory-messaging"]')
-    return getInven
+    return getInven, driver
 
 
 if __name__ == '__main__':
     args = parse_args()
-    logger.add("logs/debug.log", level=args.logLevel)
+    logger.add("logs/debug.log", level=args.logLevel, rotation="1 day")
     # logger.add("logs/{}.log".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
     #            level='DEBUG')
     
     urls = [
-        # ['https://www.nike.com/w/mens-shoes-nik1zy7ok', 'men'],
+        ['https://www.nike.com/w/mens-shoes-nik1zy7ok', 'men'],
         ['https://www.nike.com/w/womens-shoes-5e1x6zy7ok', 'women'],
         ['https://www.nike.com/w/kids-shoes-v4dhzy7ok', 'kids']
     ]
 
     # TODO： 换个时间爬一下，看一下请求里面是否有时间的东西
     req_urls = dict(
-        # men = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(16633190-45e5-4830-a068-232ac7aea82c%2C0f64ecc7-d624-4e91-b171-b83a03dd8550)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D",
+        men = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(16633190-45e5-4830-a068-232ac7aea82c%2C0f64ecc7-d624-4e91-b171-b83a03dd8550)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D",
         women = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(7baf216c-acc6-4452-9e07-39c2ca77ba32%2C16633190-45e5-4830-a068-232ac7aea82c)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D",
         kids = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(16633190-45e5-4830-a068-232ac7aea82c%2C145ce13c-5740-49bd-b2fd-0f67214765b3)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D"
     )
@@ -303,8 +329,8 @@ if __name__ == '__main__':
 
     monitor_running = threading.Event()
     monitor_thread = threading.Thread(target=queue_monitor, args=(q, QUEUESIZE//2, QUEUESIZE//4, monitor_running))
+    monitor_running.set()
     monitor_thread.start()
-    monitor_running.set() 
 
     for i in range(len(produce_thread_list)):
         produce_thread_list[i].join()
