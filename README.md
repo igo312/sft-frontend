@@ -45,9 +45,13 @@ python main_mt.py --dbName debug --collectionName nike -l INFO
 2. 使用selenium速度太慢，使用消费者-生产者模式，单线程获取库存页面html，多线程去解析页面html实现数据保存
 3. `export_mongo_to_csv.sh`  提供了将mongodb数据导出为csv的指令
 4. unique_id => rsyID 由shoeName shoeColor拼接的字符串生成的sha256作为ID
+5. (0215) 在main_mt.py中插入了对队列数量的监控，保证负载均衡(utils/monitor.py)
+6. (0215) 使用config来配置选项
 
 ## TODO
-
+**目前瓶颈在网络带宽上，消费者数量多了，网页加载速度变慢**
 - [ ] 目前mongodb只运行在localhost上，尚未在服务器上尝试
 - [ ] 目前只支持数据的插入，对于相同鞋款尚未进行更新
     1. 使用了update_one代替， 但未进行测试
+- [ ] 目前生产者只能用一个线程，尚未进行解耦
+    1. 一种是根据列别进行解耦，但是更快的应该是index进行解耦会更省心

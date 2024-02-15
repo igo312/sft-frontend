@@ -15,7 +15,7 @@ from datetime import datetime
 
 import hashlib 
 
-from utils import Timer
+from utils import Timer, queue_monitor
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -26,8 +26,10 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 from queue import Queue
 import threading
+from multiprocessing import Event
 
 import argparse
+from config import * 
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -50,16 +52,20 @@ def getWebdriver():
     return driver 
 
 def generate_unique_id(shoeName, shoeColor):
-    rsyID = hashlib.sha256(shoeName.encode() + shoeColor.encode()).hexdigest()
+    try:
+        rsyID = 'NK' + hashlib.sha256(shoeName.encode() + shoeColor.encode()).hexdigest()[:10]
+    except:
+        logger.warning("ShoeName is {}, shoeColor is {}".format(shoeName, shoeColor))
+        rsyID = 'NK' + hashlib.sha256(shoeName.encode()).hexdigest()[:10]
     return rsyID
 
 
 
-def produce_main(q, urls, req_urls, consume_count = 10):
+def produce_main(q, urls, req_urls, consume_count):
     # TODO: parse 和 请求可以进行分离
     # 使用api请求数据
-    start = 0
     for i in range(len(urls)):
+        start = 0
         url, gender = urls[i]
         req_url = req_urls[gender]
         while True:
@@ -90,17 +96,25 @@ def produce_main(q, urls, req_urls, consume_count = 10):
 
 consume_parse_count = 0
 lock = threading.Lock()
-def consume_main(q):
+def consume_main(q, thread_idx):
+    ReferUrl = "https://www.nike.com"
     def parseShoeUrl(url):
         return "/".join(url.split('/')[1:])
     
     driver = getWebdriver()
+    driver.implicitly_wait(TIMEOUT)
+
     while True:
         item = q.get()
         if isinstance(item, str) and item == 'EXIT':
             break
 
         shoe_name = item['title']
+
+        # ATTENTION 存在一类只有gift card页面，需要忽略
+        if shoe_name == "Nike Digital Gift Card":
+            continue 
+
         icolorways = item['colorways']
 
         for subItem in icolorways:
@@ -134,7 +148,7 @@ def consume_main(q):
                 shoeName = shoe_name,
                 imageUrl = image,
                 colorDes =  colorDes,
-                pdqUrl = pdqUrl,
+                pdqUrl = ReferUrl + '/' + pdqUrl,
                 pid = product_id,
                 skuid = skuid,
                 price = price_info,
@@ -151,64 +165,69 @@ def consume_main(q):
             with lock:
                 global consume_parse_count
                 consume_parse_count += 1 
-                logger.debug("consume parse count:%d"%consume_parse_count)
+                logger.debug("thread idx:{}, consume parse count:{}, url is {}".format(thread_idx, consume_parse_count, shoe_item['pdqUrl']))
     
     driver.quit()
 
                 
-def _parse_shoe_inventory(driver, pdpUrl, ReferUrl = "https://www.nike.com", max_wait_time=120):
+def _parse_shoe_inventory(driver, pdpUrl, ReferUrl = "https://www.nike.com", max_wait_time=TIMEOUT):
+    class AnyEC:
+        """Use with WebDriverWait to combine expected_conditions in an OR."""
+        def __init__(self, *args):
+            self.ecs = args
+        def __call__(self, driver):
+            for fn in self.ecs:
+                try:
+                    if fn(driver): return True
+                except:
+                    pass
+
     getInven = []
     # right now use webdriver to get inventory
     url = ReferUrl + '/' + pdpUrl
-    driver.get(url)
     try:
-        def custom_expected_conditions(driver):
-            condition1 = EC.presence_of_element_located((By.ID, 'buyTools'))
-            condition2 = EC.presence_of_element_located((By.CLASS_NAME, 'sold-out'))
-            condition3 = EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='comingSoon']"))
-
-            try:
-                return condition1(driver)
-            except NoSuchElementException:
-                pass
-            try:
-                return condition2(driver)
-            except NoSuchElementException:
-                pass
-            try:
-                return condition3(driver)
-            except NoSuchElementException:
-                pass
-
-            raise NoSuchElementException("No such element: None of the conditions are met.")
-        
-        WebDriverWait(driver, max_wait_time).until(lambda driver: custom_expected_conditions(driver))
-
+        driver.get(url)
+    except Exception as e:
+        logger.error(f"driver get {url} failed, exception: {e}")
+        with open("driver_error.txt", "a+") as f:
+            f.write("url: {} error: {}\n".format(url, e))
+        return ["driver get url {} failed".format(url)]
+    
+    try:
+        # WebDriverWait(driver, max_wait_time).until(lambda driver: custom_expected_conditions(driver))
+        WebDriverWait(driver, max_wait_time).until(AnyEC(
+            EC.presence_of_element_located((By.ID, 'buyTools')),
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-test='comingSoon']")),
+            EC.presence_of_element_located((By.CLASS_NAME, 'sold-out')),
+        ))
         soup = BeautifulSoup(driver.page_source, 'lxml')
-        if soup.select(".sold-out"):
-            logger.info("[Inventory Info] url:%s sold out"%url)
-            return ['sold out']
-        elif soup.find(attrs={'data-test' : "comingSoon"}) is not None:
-            logger.info("[Inventory Info] url:%s coming soon"%url)
-            return ['coming soon']
-        else:
-            root =  soup.find(id = 'buyTools')
-            nodes = root.select('[aria-describedby="pdp-buytools-low-inventory-messaging"]')
-            for node in nodes:
-                # 使用该属性判断是否包含库存
-                if node.has_attr('disabled'):
-                    continue 
-                else:
-                    # 将含库存的尺码加进去
-                    getInven.append(node.next_sibling.text)
     except TimeoutException as e :
         logger.error("url is {}, Timeout exception".format(url))
         return [f'not avaliable now: {url}']
     except Exception as e:
         print("Unexpected Error:", e)
-        logger.error("url is {}, Timeout exception".format(url))
+        logger.error("url is {} raise a exception".format(url))
         return [f'not avaliable now: {url}']
-        
+    # finally:
+    #     # 避免invalid session id, 不能关闭，因为只打开了一个页面，打开之后相当于退出了driver
+    #     driver.close()
+
+    if soup.select(".sold-out"):
+        logger.info("[Inventory Info] url:%s sold out"%url)
+        return ['sold out']
+    elif soup.find(attrs={'data-test' : "comingSoon"}) is not None:
+        logger.info("[Inventory Info] url:%s coming soon"%url)
+        return ['coming soon']
+    else:
+        root =  soup.find(id = 'buyTools')
+        nodes = root.select('[aria-describedby="pdp-buytools-low-inventory-messaging"]')
+        for node in nodes:
+            # 使用该属性判断是否包含库存
+            if node.has_attr('disabled'):
+                continue 
+            else:
+                # 将含库存的尺码加进去
+                getInven.append(node.next_sibling.text)
     # TODO 
     ### use requests get but cannot get form data 
     # response = requests.get(url, headers=headers, proxies=proxies)
@@ -227,32 +246,33 @@ if __name__ == '__main__':
     #            level='DEBUG')
     
     urls = [
-        ['https://www.nike.com/w/mens-shoes-nik1zy7ok', 'men'],
+        # ['https://www.nike.com/w/mens-shoes-nik1zy7ok', 'men'],
         ['https://www.nike.com/w/womens-shoes-5e1x6zy7ok', 'women'],
         ['https://www.nike.com/w/kids-shoes-v4dhzy7ok', 'kids']
     ]
 
     # TODO： 换个时间爬一下，看一下请求里面是否有时间的东西
     req_urls = dict(
-        men = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(16633190-45e5-4830-a068-232ac7aea82c%2C0f64ecc7-d624-4e91-b171-b83a03dd8550)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D",
+        # men = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(16633190-45e5-4830-a068-232ac7aea82c%2C0f64ecc7-d624-4e91-b171-b83a03dd8550)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D",
         women = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(7baf216c-acc6-4452-9e07-39c2ca77ba32%2C16633190-45e5-4830-a068-232ac7aea82c)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D",
         kids = "https://api.nike.com/cic/browse/v2?queryid=products&anonymousId=31AB795F03C1CB8DDE84057C7BF036B8&country=us&endpoint=%2Fproduct_feed%2Frollup_threads%2Fv2%3Ffilter%3Dmarketplace(US)%26filter%3Dlanguage(en)%26filter%3DemployeePrice(true)%26filter%3DattributeIds(16633190-45e5-4830-a068-232ac7aea82c%2C145ce13c-5740-49bd-b2fd-0f67214765b3)%26anchor%3D{}%26consumerChannelId%3Dd9a5bc42-4b9c-4976-858a-f159cf99c647%26count%3D24&language=en&localizedRangeStr=%7BlowestPrice%7D%20%E2%80%94%20%7BhighestPrice%7D"
     )
 
     # agent setting 
-    proxy = '127.0.0.1:1083'
-    proxies = {
-        'http': 'socks5://' + proxy,
-        'https': 'socks5://' + proxy
-    }
+    # proxy = '127.0.0.1:1083'
+    # proxies = {
+    #     'http': 'socks5://' + proxy,
+    #     'https': 'socks5://' + proxy
+    # }
+
     api_headers = {
         "Origin"     :  "https://www.nike.com",
         "Referer"    :  "https://www.nike.com",
-        "User-Agent" :  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent" :  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
 
     }
     headers = {
-        "User-Agent" :  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent" :  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         "Accept" : "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Encoding" : "gzip, deflate, br",
     }
@@ -266,24 +286,29 @@ if __name__ == '__main__':
     collection.create_index("rsyID", unique=True)
 
     # debug 
-    q = Queue(maxsize=10)
+    q = Queue(maxsize=QUEUESIZE)
     # launch consumer threads
-    consume_count = 10
     consume_thread_list = []
-    for i in range(consume_count):
-        t = threading.Thread(target=consume_main, args=(q,))
+    for i in range(CRAWL_THREAD_NUM):
+        t = threading.Thread(target=consume_main, args=(q, i))
         t.start()
         consume_thread_list.append(t)
     
     # launch produce threads
     produce_thread_list = [] 
     for i in range(1):
-        t = threading.Thread(target=produce_main, args=(q, urls, req_urls, consume_count,))
+        t = threading.Thread(target=produce_main, args=(q, urls, req_urls, CRAWL_THREAD_NUM,))
         t.start()
         produce_thread_list.append(t)
+
+    monitor_running = threading.Event()
+    monitor_thread = threading.Thread(target=queue_monitor, args=(q, QUEUESIZE//2, QUEUESIZE//4, monitor_running))
+    monitor_thread.start()
+    monitor_running.set() 
 
     for i in range(len(produce_thread_list)):
         produce_thread_list[i].join()
     for i in range(len(consume_thread_list)):
         consume_thread_list[i].join()
-    
+    monitor_running.clear() 
+    monitor_thread.join()
